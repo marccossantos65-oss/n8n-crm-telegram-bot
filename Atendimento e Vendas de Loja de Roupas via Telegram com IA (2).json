@@ -1,0 +1,1345 @@
+{
+  "name": "Atendimento e Vendas de Loja de Roupas via Telegram com IA",
+  "nodes": [
+    {
+      "parameters": {
+        "updates": [
+          "message"
+        ],
+        "additionalFields": {}
+      },
+      "id": "32c9ff01-67b6-45b3-8872-a55db1d6babf",
+      "name": "Receber Mensagem Cliente",
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -1120,
+        336
+      ],
+      "webhookId": "419de025-1ba3-4929-b806-a9b5771ef74b",
+      "credentials": {
+        "telegramApi": {
+          "id": "bhb2BTMTliP8mbDu",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $json;\n\n// Detectar origem\nlet origem = \"unknown\";\nlet chat_id = \"\";\nlet cliente = \"\";\nlet username = \"\";\nlet mensagem_cliente = \"\";\n\n// TELEGRAM\nif (input.message) {\n  origem = \"telegram\";\n  chat_id = input.message.chat?.id ?? \"\";\n  cliente = input.message.from?.first_name ?? \"\";\n  username = input.message.from?.username ?? \"\";\n  mensagem_cliente = input.message.text ?? \"\";\n}\n\n// WHATSAPP (estrutura comum APIs)\nelse if (input.contacts || input.messages) {\n  origem = \"whatsapp\";\n  chat_id = input.contacts?.[0]?.wa_id ?? \"\";\n  cliente = input.contacts?.[0]?.profile?.name ?? \"\";\n  mensagem_cliente = input.messages?.[0]?.text?.body ?? \"\";\n}\n\n// INSTAGRAM / FACEBOOK (Meta Webhook)\nelse if (input.entry) {\n  origem = \"instagram\";\n  const msg = input.entry?.[0]?.messaging?.[0] ?? {};\n  chat_id = msg.sender?.id ?? \"\";\n  mensagem_cliente = msg.message?.text ?? \"\";\n  cliente = \"cliente_instagram\";\n}\n\n// ID cliente\nconst id_cliente = `cli_${chat_id}`;\n\n// ID loja (estrutura SaaS futura)\nconst id_loja = \"loja_001\";\n\n// Data e hora\nconst agora = new Date();\nconst data = agora.toISOString().split(\"T\")[0];\nconst hora = agora.toTimeString().split(\" \")[0];\n\n// Retorno padronizado\nreturn [{\n  json: {\n\n    id_loja,\n\n    id_cliente,\n    cliente,\n    chat_id,\n    username,\n\n    mensagem_cliente,\n    origem,\n\n    data,\n    hora,\n\n    etapa_funil: \"novo_contato\",\n    produto_interesse: \"\",\n    valor_estimado: \"\",\n    status: \"novo\"\n\n  }\n}];"
+      },
+      "id": "5ae3421a-f00f-4f88-a973-7cb4a2591d19",
+      "name": "Preparar Dados Cliente",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -896,
+        336
+      ]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1yrsjvR31JnMsAcTV2TTHmYgL8O7KVtxeZ3Q7G7kWJsE",
+          "mode": "list",
+          "cachedResultName": "vendas_loja_n8n",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1yrsjvR31JnMsAcTV2TTHmYgL8O7KVtxeZ3Q7G7kWJsE/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1387421067,
+          "mode": "list",
+          "cachedResultName": "CLIENTES",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1yrsjvR31JnMsAcTV2TTHmYgL8O7KVtxeZ3Q7G7kWJsE/edit#gid=1387421067"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "id_cliente",
+              "lookupValue": "={{ $json.id_cliente }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "245afac5-1634-4e1f-9362-b07ae97b707d",
+      "name": "Buscar Cliente",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        -464,
+        208
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "HdQBYAWAjLMRZsJk",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "key",
+              "value": "AIzaSyClFGCu7SiWN3esqc8bnZpKkqoAAHX9Ecg"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"contents\": [\n    {\n      \"parts\": [\n        {\n          \"text\": \"Classifique a mensagem do cliente e responda APENAS com JSON válido.\\n\\nFormato:\\n{\\n  \\\"status_atendimento\\\": \\\"saudacao\\\" | \\\"listar_produtos\\\" | \\\"buscar_produto\\\" | \\\"pedido\\\" | \\\"suporte\\\",\\n  \\\"produto\\\": \\\"\\\",\\n  \\\"resposta_ia\\\": \\\"\\\",\\n  \\\"etapa_funil\\\": \\\"atendimento\\\"\\n}\\n\\nMensagem do cliente: {{$json.mensagem_cliente}}\\n\\nNão escreva nada além do JSON.\"\n        }\n      ]\n    }\n  ]\n}",
+        "options": {}
+      },
+      "id": "964d8606-a623-4cb9-aded-95c35ebf967b",
+      "name": "Analisar Intenção com Gemini",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -672,
+        432
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const entrada = $input.first().json;\n\nlet texto = \"\";\n\nif (\n  entrada &&\n  entrada.candidates &&\n  entrada.candidates[0] &&\n  entrada.candidates[0].content &&\n  entrada.candidates[0].content.parts &&\n  entrada.candidates[0].content.parts[0] &&\n  entrada.candidates[0].content.parts[0].text\n) {\n  texto = entrada.candidates[0].content.parts[0].text;\n}\n\nif (!texto) {\n  return [\n    {\n      json: {\n        status_atendimento: \"suporte\",\n        produto: \"\",\n        resposta_ia: \"Desculpe, ocorreu um erro ao processar sua mensagem.\",\n        etapa_funil: \"erro\"\n      }\n    }\n  ];\n}\n\n// limpar marcações comuns\ntexto = texto.split(\"json\").join(\"\");\ntexto = texto.split(\"\").join(\"\");\ntexto = texto.trim();\n\n// remover \"json\" no começo, se vier\nif (texto.toLowerCase().startsWith(\"json\")) {\n  texto = texto.slice(4).trim();\n}\n\n// tentar extrair só o objeto JSON\nconst inicio = texto.indexOf(\"{\");\nconst fim = texto.lastIndexOf(\"}\");\n\nif (inicio !== -1 && fim !== -1 && fim > inicio) {\n  texto = texto.slice(inicio, fim + 1);\n}\n\nlet dados;\n\ntry {\n  dados = JSON.parse(texto);\n} catch (e) {\n  dados = {\n    status_atendimento: \"suporte\",\n    produto: \"\",\n    resposta_ia: texto,\n    etapa_funil: \"atendimento\"\n  };\n}\n\nconst statusBruto = String(dados.status_atendimento || dados.intencao || \"\")\n  .toLowerCase()\n  .normalize(\"NFD\")\n  .replace(/[\\u0300-\\u036f]/g, \"\")\n  .trim();\n\nconst produtoBruto = String(dados.produto || \"\").trim();\nconst respostaBruta = String(dados.resposta_ia || dados.resposta || \"\").trim();\n\nlet status_atendimento = \"suporte\";\n\nif ([\"saudacao\", \"oi\", \"ola\", \"cumprimento\"].includes(statusBruto)) {\n  status_atendimento = \"saudacao\";\n} else if (\n  [\"listar_produtos\", \"listar\", \"ver_produtos\", \"mostrar_produtos\", \"catalogo\"].includes(statusBruto)\n) {\n  status_atendimento = \"listar_produtos\";\n} else if (\n  [\"buscar_produto\", \"produto\", \"consultar_produto\", \"ver_produto\"].includes(statusBruto)\n) {\n  status_atendimento = produtoBruto ? \"buscar_produto\" : \"listar_produtos\";\n} else if (\n  [\"pedido\", \"comprar\", \"fazer_pedido\", \"realizar_pedido\"].includes(statusBruto)\n) {\n  status_atendimento = \"pedido\";\n}\n\nlet resposta_ia = respostaBruta;\n\nif (!resposta_ia) {\n  if (status_atendimento === \"saudacao\") {\n    resposta_ia = \"Olá! Como posso te ajudar hoje?\";\n  } else if (status_atendimento === \"listar_produtos\") {\n    resposta_ia = \"Claro! Vou te mostrar alguns produtos disponíveis.\";\n  } else if (status_atendimento === \"buscar_produto\") {\n    resposta_ia = \"Vou verificar esse produto para você.\";\n  } else if (status_atendimento === \"pedido\") {\n    resposta_ia = \"Perfeito! Vou registrar seu pedido.\";\n  } else {\n    resposta_ia = \"Não entendi muito bem. Você quer ver produtos, fazer um pedido ou falar com o atendimento?\";\n  }\n}\n\nreturn [\n  {\n    json: {\n      status_atendimento: status_atendimento,\n      produto: produtoBruto,\n      resposta_ia: resposta_ia,\n      etapa_funil: String(dados.etapa_funil || \"atendimento\").trim()\n    }\n  }\n];"
+      },
+      "id": "e8ceb034-306d-4533-8716-07bddf1e0631",
+      "name": "Processar Resposta IA",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -448,
+        432
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1yrsjvR31JnMsAcTV2TTHmYgL8O7KVtxeZ3Q7G7kWJsE",
+          "mode": "list",
+          "cachedResultName": "vendas_loja_n8n",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1yrsjvR31JnMsAcTV2TTHmYgL8O7KVtxeZ3Q7G7kWJsE/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 434526621,
+          "mode": "list",
+          "cachedResultName": "CRM_ATENDIMENTO",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1yrsjvR31JnMsAcTV2TTHmYgL8O7KVtxeZ3Q7G7kWJsE/edit#gid=434526621"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "id_loja": "={{$node[\"Preparar Dados Cliente\"].json[\"id_loja\"]}}",
+            "id_cliente": "={{$node[\"Preparar Dados Cliente\"].json[\"id_cliente\"]}}",
+            "cliente": "={{$node[\"Preparar Dados Cliente\"].json[\"cliente\"]}}",
+            "mensagem_cliente": "={{$node[\"Preparar Dados Cliente\"].json[\"mensagem_cliente\"]}}",
+            "resposta_ia": "={{ $json.resposta_ia }}",
+            "status_atendimento": "={{ $json.status_atendimento }}",
+            "data": "={{new Date().toISOString().split('T')[0]}}",
+            "hora": "={{new Date().toTimeString().split(' ')[0]}}",
+            "origem": "telegram"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "id_loja",
+              "displayName": "id_loja",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "id_cliente",
+              "displayName": "id_cliente",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "cliente",
+              "displayName": "cliente",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "mensagem_cliente",
+              "displayName": "mensagem_cliente",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "resposta_ia",
+              "displayName": "resposta_ia",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "status_atendimento",
+              "displayName": "status_atendimento",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "data",
+              "displayName": "data",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "hora",
+              "displayName": "hora",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "origem",
+              "displayName": "origem",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "9992e8a5-ad3f-429f-b4b7-249d488aaa09",
+      "name": "Registrar Atendimento",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        -224,
+        432
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "HdQBYAWAjLMRZsJk",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "4aaef621-6fed-4d62-b2d9-0d9146e583bb",
+                    "leftValue": "={{ $json.status_atendimento }}",
+                    "rightValue": "saudacao",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "saudacao"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "62c4dd83-79f4-4159-8c64-4458484a5a11",
+                    "leftValue": "={{ $json.status_atendimento }}",
+                    "rightValue": "listar_produtos",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "listar_produtos"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "67ad4f6d-1908-424b-a5ad-18fa429a1dc9",
+                    "leftValue": "={{ $json.status_atendimento }}",
+                    "rightValue": "buscar_produto",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "buscar_produto"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "3debd0ea-5b3a-4c3c-b4b7-fb3034097f81",
+                    "leftValue": "={{ $json.status_atendimento }}",
+                    "rightValue": "pedido",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "pedido"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "6dafc897-d1c8-43fc-b366-c4464f1c3808",
+      "name": "Verificar Intenção",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        -32,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const entrada = $json;\nconst mensagem = String(entrada.mensagem_cliente || \"\").toLowerCase();\n\nlet produto = \"\";\n\nif (mensagem.includes(\"tenis\") || mensagem.includes(\"tênis\")) {\n  produto = \"Tênis\";\n} else if (mensagem.includes(\"camisa\")) {\n  produto = \"Camisa\";\n} else if (mensagem.includes(\"comida\")) {\n  produto = \"Comida\";\n} else {\n  produto = entrada.produto || \"Produto não identificado\";\n}\n\nlet grupo = \"\";\nif (produto === \"Tênis\") {\n  grupo = \"calçados\";\n} else if (produto === \"Camisa\") {\n  grupo = \"roupas\";\n} else if (produto === \"Comida\") {\n  grupo = \"alimentos\";\n}\n\nlet cor = \"\";\nif (mensagem.includes(\"preto\")) {\n  cor = \"preto\";\n} else if (mensagem.includes(\"branco\")) {\n  cor = \"branco\";\n} else if (mensagem.includes(\"azul\")) {\n  cor = \"azul\";\n} else if (mensagem.includes(\"vermelho\")) {\n  cor = \"vermelho\";\n}\n\nreturn {\n  json: {\n    id_loja: entrada.id_loja || \"loja_001\",\n    id_pedido: Date.now().toString(),\n    id_cliente: entrada.id_cliente || \"\",\n    cliente: entrada.cliente || \"\",\n    id_do_chat: entrada.id_do_chat || entrada.id_cliente || \"\",\n    mensagem_cliente: entrada.mensagem_cliente || \"\",\n\n    id_produto: \"\",\n    produto: produto,\n    produto_nome: produto,\n    grupo: grupo,\n    cor: cor,\n\n    quantidade: 1,\n    valor_total: 0,\n\n    forma_pagamento: \"pendente\",\n    status_pedido: \"novo\",\n    status_pagamento: \"pendente\",\n\n    endereco_entrega: \"aguardando_endereco\",\n    codigo_rastreio: \"aguardando_envio\",\n\n    status_atendimento: \"pedido\",\n    etapa_funil: \"pedido\",\n\n    dados: entrada.dados || \"\",\n    hora: entrada.hora || \"\"\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        272,
+        656
+      ],
+      "id": "8f12bb4e-c0c9-4f0b-97ae-93bb561b6cbd",
+      "name": "criar dados pedidos"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Receber Mensagem Cliente').item.json.message.chat.id }}",
+        "text": "={{ $json.resposta_ia }}",
+        "additionalFields": {
+          "appendAttribution": false,
+          "disable_notification": true
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        272,
+        224
+      ],
+      "id": "6857a5b2-556f-4c90-8bbd-bfa83ef7d802",
+      "name": "responder saudação",
+      "webhookId": "54d7d63c-19bf-48d8-a995-f6586a3a391b",
+      "credentials": {
+        "telegramApi": {
+          "id": "bhb2BTMTliP8mbDu",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "982b9bbc-b2c3-4882-a2ab-bf989f0baee8",
+              "leftValue": "={{ $json.estoque }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        464,
+        432
+      ],
+      "id": "fbee3613-dcda-4bf5-ab5d-5f7b04929411",
+      "name": "verificar estoque"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1yrsjvR31JnMsAcTV2TTHmYgL8O7KVtxeZ3Q7G7kWJsE",
+          "mode": "list",
+          "cachedResultName": "vendas_loja_n8n",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1yrsjvR31JnMsAcTV2TTHmYgL8O7KVtxeZ3Q7G7kWJsE/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 979524638,
+          "mode": "list",
+          "cachedResultName": "PRODUTOS",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1yrsjvR31JnMsAcTV2TTHmYgL8O7KVtxeZ3Q7G7kWJsE/edit#gid=979524638"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        272,
+        432
+      ],
+      "id": "58f72dc2-e4d1-4e55-b793-72726a89d26d",
+      "name": "Consultar_produto",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "HdQBYAWAjLMRZsJk",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Receber Mensagem Cliente').item.json.message.chat.id }}",
+        "text": "={{ $json.mensagem_resposta }}",
+        "additionalFields": {
+          "appendAttribution": false,
+          "disable_notification": true
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        896,
+        224
+      ],
+      "id": "15f75449-7dfa-4857-8ae1-b96ce9f5ebd4",
+      "name": "Envia Informação produto",
+      "webhookId": "e776116e-ceaf-4398-ac8f-196a6c257d7b",
+      "credentials": {
+        "telegramApi": {
+          "id": "bhb2BTMTliP8mbDu",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Receber Mensagem Cliente').item.json.message.chat.id }}",
+        "text": "=No momento esse produto está sem estoque. Se quiser, posso te mostrar outra opção disponível.\n",
+        "additionalFields": {
+          "appendAttribution": false,
+          "disable_notification": true
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        720,
+        448
+      ],
+      "id": "ab3c1390-6eba-4ea9-81ed-9f3047229d11",
+      "name": "produto sem estoque",
+      "webhookId": "157045f9-7a31-449c-828a-2979dc96dbcd",
+      "credentials": {
+        "telegramApi": {
+          "id": "bhb2BTMTliP8mbDu",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1yrsjvR31JnMsAcTV2TTHmYgL8O7KVtxeZ3Q7G7kWJsE",
+          "mode": "list",
+          "cachedResultName": "vendas_loja_n8n",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1yrsjvR31JnMsAcTV2TTHmYgL8O7KVtxeZ3Q7G7kWJsE/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 930375014,
+          "mode": "list",
+          "cachedResultName": "PEDIDOS",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1yrsjvR31JnMsAcTV2TTHmYgL8O7KVtxeZ3Q7G7kWJsE/edit#gid=930375014"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "id_cliente": "={{ $json.id_cliente }}",
+            "id_pedido": "={{ $json.id_pedido }}",
+            "id_produto": "={{ $json.produto }}",
+            "quantidade": "={{ $json.quantidade }}",
+            "valor_total": "={{ $json.valor_total }}",
+            "forma_pagamento": "={{ $json.forma_pagamento }}",
+            "status_pedido": "={{ $json.status_pedido }}",
+            "status_pagamento": "={{ $json.status_pagamento }}",
+            "endereco_entrega": "={{ $json.endereco_entrega }}",
+            "codigo_rastreio": "={{ $json.codigo_rastreio }}",
+            "hora": "={{ $json.hora }}",
+            "id-loja": "={{ $json.id_loja }}",
+            "data": "={{ $json.dados }}",
+            "produlto_nome": "={{ $json.produto }}",
+            "tamanho ": "={{ $json.grupo }}",
+            "cor": "={{ $json.cor }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "id-loja",
+              "displayName": "id-loja",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "id_pedido",
+              "displayName": "id_pedido",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "id_cliente",
+              "displayName": "id_cliente",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "id_produto",
+              "displayName": "id_produto",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "quantidade",
+              "displayName": "quantidade",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "valor_total",
+              "displayName": "valor_total",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "forma_pagamento",
+              "displayName": "forma_pagamento",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "status_pedido",
+              "displayName": "status_pedido",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "status_pagamento",
+              "displayName": "status_pagamento",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "endereco_entrega",
+              "displayName": "endereco_entrega",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "codigo_rastreio",
+              "displayName": "codigo_rastreio",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "data",
+              "displayName": "data",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "hora",
+              "displayName": "hora",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "produlto_nome",
+              "displayName": "produlto_nome",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "tamanho ",
+              "displayName": "tamanho ",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "cor",
+              "displayName": "cor",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        528,
+        656
+      ],
+      "id": "0c6a35d4-4978-494f-9345-44f5ea096412",
+      "name": "Registra pedido",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "HdQBYAWAjLMRZsJk",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const produto = $json.nome_produto;\nconst preco = $json.preco;\nconst estoque = $json.estoque;\nconst cor = $json.cor;\nconst tamanho = $json.tamanho;\n\nconst mensagem = `📦 Produto: ${produto}\n📏 Tamanho: ${tamanho}\n🎨 Cor: ${cor}\n💰 Preço: R$ ${preco}\n📦 Estoque disponível: ${estoque}\n\nDeseja fazer o pedido?`;\n\nreturn {\n  json: {\n    mensagem_resposta: mensagem\n  }\n};\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        608,
+        224
+      ],
+      "id": "f50a49b6-62a1-41c6-ac97-4e1b324b6a77",
+      "name": "Montar Mensagem produto "
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const agora = new Date();\n\nreturn {\n  json: {\n    ...$json,\n    ultima_interacao: agora.toLocaleString(\"pt-BR\")\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -672,
+        208
+      ],
+      "id": "9c81dd8a-31ce-4272-82d4-24256556cbd4",
+      "name": "ultima_interacao"
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "value": "1yrsjvR31JnMsAcTV2TTHmYgL8O7KVtxeZ3Q7G7kWJsE",
+          "mode": "list",
+          "cachedResultName": "vendas_loja_n8n",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1yrsjvR31JnMsAcTV2TTHmYgL8O7KVtxeZ3Q7G7kWJsE/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1387421067,
+          "mode": "list",
+          "cachedResultName": "CLIENTES",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1yrsjvR31JnMsAcTV2TTHmYgL8O7KVtxeZ3Q7G7kWJsE/edit#gid=1387421067"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "id_loja": "={{ $('Preparar Dados Cliente').item.json.id_loja }}",
+            "id_cliente": "={{ $('Preparar Dados Cliente').item.json.id_cliente }}",
+            "cliente": "={{ $('Preparar Dados Cliente').item.json.cliente }}",
+            "id_canal": "={{ $('Preparar Dados Cliente').item.json.chat_id }}",
+            "telefone_canal": "={{ $('Preparar Dados Cliente').item.json.chat_id}}",
+            "status_cliente": "novo",
+            "ultima_compra": "={{ $json.ultima_interacao }}"
+          },
+          "matchingColumns": [
+            "telefone_canal"
+          ],
+          "schema": [
+            {
+              "id": "id_loja",
+              "displayName": "id_loja",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "id_cliente",
+              "displayName": "id_cliente",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "cliente",
+              "displayName": "cliente",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "id_canal",
+              "displayName": "id_canal",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "telefone_canal",
+              "displayName": "telefone_canal",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "primeira_compra",
+              "displayName": "primeira_compra",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "ultima_compra",
+              "displayName": "ultima_compra",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "total_compras",
+              "displayName": "total_compras",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "total_gasto",
+              "displayName": "total_gasto",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "status_cliente",
+              "displayName": "status_cliente",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "observacoes",
+              "displayName": "observacoes",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        0,
+        0
+      ],
+      "id": "15db09ff-8636-44f6-a453-1c561252533e",
+      "name": "Append or update row in sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "HdQBYAWAjLMRZsJk",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "5c9f399f-7be1-4dd5-92b1-7f2e2087f23a",
+              "leftValue": "",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -256,
+        208
+      ],
+      "id": "ddcb6483-5bf5-49d0-998c-a720382e9606",
+      "name": "Cliente_Existe"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1yrsjvR31JnMsAcTV2TTHmYgL8O7KVtxeZ3Q7G7kWJsE",
+          "mode": "list",
+          "cachedResultName": "vendas_loja_n8n",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1yrsjvR31JnMsAcTV2TTHmYgL8O7KVtxeZ3Q7G7kWJsE/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1387421067,
+          "mode": "list",
+          "cachedResultName": "CLIENTES",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1yrsjvR31JnMsAcTV2TTHmYgL8O7KVtxeZ3Q7G7kWJsE/edit#gid=1387421067"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "id_loja": "={{\n   $('Preparar Dados Cliente').item,json.id_loja\n}}",
+            "id_cliente": "={{    $('Preparar Dados Cliente').item,json.id_cliente }}",
+            "cliente": "={{    $('Preparar Dados Cliente').item,json.cliente }}\n",
+            "id_canal": "={{    $('Preparar Dados Cliente').item,json.id_do_chat }}",
+            "telefone_canal": "={{    $('Preparar Dados Cliente').item,json.id_do_chat }}",
+            "ultima_compra": "{{ $json.ultima_interacao }}",
+            "status_cliente": "novo"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "id_loja",
+              "displayName": "id_loja",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "id_cliente",
+              "displayName": "id_cliente",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "cliente",
+              "displayName": "cliente",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "id_canal",
+              "displayName": "id_canal",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "telefone_canal",
+              "displayName": "telefone_canal",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "primeira_compra",
+              "displayName": "primeira_compra",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "ultima_compra",
+              "displayName": "ultima_compra",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "total_compras",
+              "displayName": "total_compras",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "total_gasto",
+              "displayName": "total_gasto",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "status_cliente",
+              "displayName": "status_cliente",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "observacoes",
+              "displayName": "observacoes",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        0,
+        224
+      ],
+      "id": "6a6cbb04-9830-4a40-8827-385c089262df",
+      "name": "criar_cliente",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "HdQBYAWAjLMRZsJk",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Receber Mensagem Cliente').item.json.message.chat.id }}",
+        "text": "=Perfeito! Seu pedido foi registrado ✅\n\nAgora me envie:\n\n📦 Modelo do produto  \n📏 Tamanho  \n📍 Endereço de entrega",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        736,
+        656
+      ],
+      "id": "9e2f14a4-1450-4ff5-9bdd-0dbaf1702a79",
+      "name": "Send a text message",
+      "webhookId": "b9445947-dd32-4298-955d-4892d4fcc706",
+      "credentials": {
+        "telegramApi": {
+          "id": "bhb2BTMTliP8mbDu",
+          "name": "Telegram account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Analisar Intenção com Gemini": {
+      "main": [
+        [
+          {
+            "node": "Processar Resposta IA",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Receber Mensagem Cliente": {
+      "main": [
+        [
+          {
+            "node": "Preparar Dados Cliente",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar Dados Cliente": {
+      "main": [
+        [
+          {
+            "node": "Analisar Intenção com Gemini",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "ultima_interacao",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Processar Resposta IA": {
+      "main": [
+        [
+          {
+            "node": "Registrar Atendimento",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Registrar Atendimento": {
+      "main": [
+        [
+          {
+            "node": "Verificar Intenção",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verificar Intenção": {
+      "main": [
+        [
+          {
+            "node": "responder saudação",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Consultar_produto",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Consultar_produto",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "criar dados pedidos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "verificar estoque": {
+      "main": [
+        [
+          {
+            "node": "Montar Mensagem produto ",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "produto sem estoque",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Consultar_produto": {
+      "main": [
+        [
+          {
+            "node": "verificar estoque",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "criar dados pedidos": {
+      "main": [
+        [
+          {
+            "node": "Registra pedido",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Montar Mensagem produto ": {
+      "main": [
+        [
+          {
+            "node": "Envia Informação produto",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar Cliente": {
+      "main": [
+        [
+          {
+            "node": "Cliente_Existe",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ultima_interacao": {
+      "main": [
+        [
+          {
+            "node": "Buscar Cliente",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cliente_Existe": {
+      "main": [
+        [
+          {
+            "node": "Append or update row in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "criar_cliente",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Registra pedido": {
+      "main": [
+        [
+          {
+            "node": "Send a text message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "00e5efff-3fc4-4ccc-a324-489874964363",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "b063f5ce1b4f48133138edcf11a1cb802b04a2e72dfb550edd233552a8c6eccb"
+  },
+  "id": "GYPJW41gtl50DFwc",
+  "tags": []
+}
